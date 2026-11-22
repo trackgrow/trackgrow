@@ -697,6 +697,11 @@ def edit_page(slug):
 
                 <button type="submit">Save Changes</button>
             </form>
+            <form method="post" action="/publish/{{slug}}" style="margin-top:15px;">
+    <button type="submit" style="background:#16a37a;">
+        🚀 Publish Landing Page
+    </button>
+</form>
         </div>
 
         <div class="card">
@@ -713,8 +718,8 @@ def edit_page(slug):
        .replace("{{headline}}", data.get("headline", p["title"]))
        .replace("{{description}}", data.get("description", "Describe your offer here."))
        .replace("{{button_text}}", data.get("button_text", "Get Started"))
-       .replace("{{button_url}}", data.get("button_url", ""))
-       .replace("{{bg_color}}", data.get("bg_color", "#101b32")),
+       .replace("{{button_url}}", data.get("button_url", "")).replace("{{bg_color}}", data.get("bg_color", "#101b32"))
+       .replace("{{slug}}", slug),
        "Landing Page Editor")
 @app.route("/publish/<slug>", methods=["POST"])
 @login_required
