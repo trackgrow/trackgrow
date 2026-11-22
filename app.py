@@ -636,7 +636,6 @@ def telegram_webhook():
 
     return {"ok": True}
 
-
 @app.route("/editor/<slug>", methods=["GET", "POST"])
 @login_required
 def edit_page(slug):
@@ -667,60 +666,202 @@ def edit_page(slug):
                     "UPDATE pages SET title=?, page_data=? WHERE id=?",
                     (title, json.dumps(data), p["id"])
                 )
-                flash("Landing page updated successfully!")
+                flash("Your design has been saved!")
                 return redirect(url_for("edit_page", slug=slug))
 
     return page("""
-    <div class="grid">
-        <div class="card">
-            <h1>Landing Page Editor</h1>
-            <p class="muted">Customize your landing page content.</p>
+    <style>
+    .editor-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+    .editor-layout{display:grid;grid-template-columns:260px minmax(0,1fr) 260px;gap:16px;align-items:start}
+    .editor-panel{background:#111d32;border:1px solid #293b55;border-radius:15px;padding:18px}
+    .editor-panel h3{margin-top:0}
+    .editor-canvas{background:#dce3ef;border-radius:15px;padding:20px;min-height:550px}
+    .canvas-page{min-height:500px;border-radius:10px;padding:45px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .canvas-page h1{font-size:36px;max-width:600px}
+    .canvas-page p{max-width:520px;line-height:1.8}
+    .canvas-button{display:inline-block;background:#5878f5;color:white;padding:13px 25px;border-radius:9px;font-weight:bold}
+    .editor-label{display:block;color:#aebed7;font-size:12px;font-weight:bold;margin:15px 0 5px}
+    .editor-panel input,.editor-panel textarea{margin:5px 0 12px}
+    .tool-item{background:#1a2a44;border:1px solid #344967;border-radius:10px;padding:13px;margin:9px 0;color:#dce7ff}
+    .editor-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .editor-actions button{font-size:13px}
+    @media(max-width:850px){
+      .editor-layout{grid-template-columns:1fr}
+      .editor-canvas{min-height:380px;padding:10px}
+      .canvas-page{min-height:350px;padding:25px 12px}
+      .canvas-page h1{font-size:27px}
+      .editor-panel{padding:15px}
+    }
+    </style>
 
-            <form method="post">
-                <label>Page Title</label>
-                <input name="title" value="{{title}}" required>
+    <div class="editor-top">
+        <div>
+            <div class="muted">TRACKGROW WEBSITE BUILDER</div>
+            <h1 style="margin:8px 0;">Page Editor</h1>
+            <small>Design and customize your landing page.</small>
+        </div>
+        <div class="editor-actions">
+            <a class="btn btn2" href="/dashboard">Dashboard</a>
+            <button type="submit" form="page-editor">Save Design</button>
+        </div>
+    </div>
 
-                <label>Headline</label>
-                <input name="headline" value="{{headline}}" required>
+    <form method="post" id="page-editor">
+    <div class="editor-layout">
 
-                <label>Description</label>
-                <textarea name="description" rows="5" required>{{description}}</textarea>
+        <div class="editor-panel">
+            <h3>Content Editor</h3>
+            <p class="muted">Edit your page content.</p>
 
-                <label>Button Text</label>
-                <input name="button_text" value="{{button_text}}" required>
+            <label class="editor-label">Page Name</label>
+            <input name="title" value="{{title}}" required>
 
-                <label>Button Link</label>
-                <input name="button_url" value="{{button_url}}" placeholder="https://example.com">
+            <label class="editor-label">Main Headline</label>
+            <input id="headline-input" name="headline" value="{{headline}}" required>
 
-                <label>Background Color</label>
-                <input type="color" name="bg_color" value="{{bg_color}}">
+            <label class="editor-label">Description</label>
+            <textarea id="description-input" name="description" rows="5" required>{{description}}</textarea>
 
-                <button type="submit">Save Changes</button>
-            </form>
-            <form method="post" action="/publish/{{slug}}" style="margin-top:15px;">
-    <button type="submit" style="background:#16a37a;">
-        🚀 Publish Landing Page
-    </button>
-</form>
+            <label class="editor-label">Button Text</label>
+            <input id="button-input" name="button_text" value="{{button_text}}" required>
+
+            <label class="editor-label">Button Link</label>
+            <input name="button_url" value="{{button_url}}" placeholder="https://example.com">
+
+            <div class="tool-item">✦ Headline Section</div>
+            <div class="tool-item">▤ Description Section</div>
+            <div class="tool-item">▣ Call To Action Button</div>
         </div>
 
-        <div class="card">
-            <h2>Live Preview</h2>
-            <div style="background:{{bg_color}};padding:35px 20px;border-radius:14px;text-align:center;min-height:300px;">
-                <h1>{{headline}}</h1>
-                <p>{{description}}</p>
-                <span class="btn">{{button_text}}</span>
+        <div>
+            <div class="editor-panel editor-top">
+                <strong>Page Canvas</strong>
+                <span class="template-tag">LIVE PREVIEW</span>
             </div>
-            <p class="muted">Preview of your page design.</p>
+
+            <div class="editor-canvas">
+                <div class="canvas-page" id="preview-page"
+                     style="background:{{bg_color}};color:white;">
+                    <h1 id="preview-headline">{{headline}}</h1>
+                    <p id="preview-description">{{description}}</p>
+                    <span class="canvas-button" id="preview-button">{{button_text}}</span>
+                </div>
+            </div>
+
+            <div class="editor-panel" style="margin-top:15px;">
+                <strong>Responsive Design</strong>
+                <p class="muted">Your landing page is designed to adapt to desktop and mobile screens.</p>
+            </div>
         </div>
+
+        <div class="editor-panel">
+            <h3>Design Settings</h3>
+            <p class="muted">Customize your page appearance.</p>
+
+            <label class="editor-label">Background Color</label>
+            <input type="color" id="bg-input" name="bg_color" value="{{bg_color}}">
+
+            <div class="tool-item">🎨 Background Style</div>
+            <div class="tool-item">🔤 Typography</div>
+            <div class="tool-item">📱 Responsive Layout</div>
+
+            <hr style="border-color:#293b55;margin:20px 0;">
+
+            <h3>Publishing</h3>
+            <p class="muted">Save your design before publishing.</p>
+
+            <button type="submit" form="page-editor">Save Design</button>
+        </div>
+
+    </div>
+    </form>
+
+    <script>
+    const headlineInput = document.getElementById("headline-input");
+    const descriptionInput = document.getElementById("description-input");
+    const buttonInput = document.getElementById("button-input");
+    const bgInput = document.getElementById("bg-input");
+
+    headlineInput.addEventListener("input", function(){
+        document.getElementById("preview-headline").textContent = this.value;
+    });
+
+    descriptionInput.addEventListener("input", function(){
+        document.getElementById("preview-description").textContent = this.value;
+    });
+
+    buttonInput.addEventListener("input", function(){
+        document.getElementById("preview-button").textContent = this.value;
+    });
+
+    bgInput.addEventListener("input", function(){
+        document.getElementById("preview-page").style.background = this.value;
+    });
+    </script>
+
+    <div class="editor-panel" style="margin-top:20px;">
+        <h3>🚀 Publish Your Landing Page</h3>
+        <p class="muted">Make your saved landing page available through a public link.</p>
+        <form method="post" action="/publish/{{slug}}">
+            <button type="submit" style="background:#16a37a;">Publish Landing Page</button>
+        </form>
+        <p><small>Public URL: /p/{{slug}}</small></p>
     </div>
     """.replace("{{title}}", p["title"])
        .replace("{{headline}}", data.get("headline", p["title"]))
        .replace("{{description}}", data.get("description", "Describe your offer here."))
        .replace("{{button_text}}", data.get("button_text", "Get Started"))
-       .replace("{{button_url}}", data.get("button_url", "")).replace("{{bg_color}}", data.get("bg_color", "#101b32"))
+       .replace("{{button_url}}", data.get("button_url", ""))
+       .replace("{{bg_color}}", data.get("bg_color", "#101b32"))
        .replace("{{slug}}", slug),
-       "Landing Page Editor")
+       "TrackGrow Visual Editor")
+            </div>
+
+        <div class="card">
+            <h2>Live Preview</h2>
+            <div id="preview" style="background:{{bg_color}};padding:35px 20px;border-radius:14px;text-align:center;min-height:300px;">
+                <h1 id="preview-headline">{{headline}}</h1>
+                <p id="preview-description">{{description}}</p>
+                <a class="btn" id="preview-button" href="{{button_url}}">{{button_text}}</a>
+            </div>
+            <p class="muted">Your landing page preview.</p>
+        </div>
+    </div>
+        <script>
+    const form = document.getElementById("editor-form");
+    const headline = document.querySelector('[name="headline"]');
+    const description = document.querySelector('[name="description"]');
+    const buttonText = document.querySelector('[name="button_text"]');
+    const buttonUrl = document.querySelector('[name="button_url"]');
+    const bgColor = document.querySelector('[name="bg_color"]');
+
+    headline.addEventListener("input", () => {
+        document.getElementById("preview-headline").textContent = headline.value;
+    });
+
+    description.addEventListener("input", () => {
+        document.getElementById("preview-description").textContent = description.value;
+    });
+
+    buttonText.addEventListener("input", () => {
+        document.getElementById("preview-button").textContent = buttonText.value;
+    });
+
+    buttonUrl.addEventListener("input", () => {
+        document.getElementById("preview-button").href = buttonUrl.value;
+    });
+
+    bgColor.addEventListener("input", () => {
+        document.getElementById("preview").style.background = bgColor.value;
+    });
+    </script>
+    """.replace("{{title}}", p["title"])
+       .replace("{{headline}}", data.get("headline", p["title"]))
+       .replace("{{description}}", data.get("description", "Describe your offer here."))
+       .replace("{{button_text}}", data.get("button_text", "Get Started"))
+       .replace("{{button_url}}", data.get("button_url", ""))
+       .replace("{{bg_color}}", data.get("bg_color", "#101b32")),
+       "TrackGrow Visual Editor")
 @app.route("/publish/<slug>", methods=["POST"])
 @login_required
 def publish_page(slug):
