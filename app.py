@@ -1,182 +1,51 @@
-import os
-import json
-import sqlite3
-import secrets
+import os, secrets, sqlite3
 from functools import wraps
-
+from urllib.parse import urlencode
 from flask import Flask, request, redirect, url_for, render_template_string, session, flash, abort
 from werkzeug.security import generate_password_hash, check_password_hash
-from markupsafe import escape
 
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(APP_DIR, "trackgrow.db"))
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
-DB_PATH = os.environ.get("DB_PATH", "trackgrow.db")
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").lower().strip()
-
-
-# ---------------- DATABASE ----------------
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-before-deploying")
 
 def db():
-    con = sqlite3.connect(DB_PATH)
-    con.row_factory = sqlite3.Row
-    return con
-
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
     with db() as con:
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT DEFAULT '',
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                role TEXT DEFAULT 'user',
-                plan TEXT DEFAULT 'free',
-                plan_status TEXT DEFAULT 'active',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
+        con.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            channel_url TEXT NOT NULL,
+            headline TEXT NOT NULL,
+            description TEXT NOT NULL,
+            button_text TEXT NOT NULL,
+            clicks INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            source TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+        );
         """)
-
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS pages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                title TEXT DEFAULT 'My Landing Page',
-                slug TEXT UNIQUE NOT NULL,
-                template_id TEXT DEFAULT 'business',
-                page_data TEXT DEFAULT '{}',
-                status TEXT DEFAULT 'draft',
-                page_views INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                published_at TEXT
-            )
-        """)
-
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS plan_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                plan TEXT NOT NULL,
-                amount TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                page_id INTEGER,
-                event_type TEXT,
-                source TEXT DEFAULT '',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        migrations = {
-            "users": {
-                "name": "TEXT DEFAULT ''",
-                "role": "TEXT DEFAULT 'user'",
-                "plan": "TEXT DEFAULT 'free'",
-                "plan_status": "TEXT DEFAULT 'active'",
-                "created_at": "TEXT"
-            },
-            "pages": {
-                "template_id": "TEXT DEFAULT 'business'",
-                "page_data": "TEXT DEFAULT '{}'",
-                "status": "TEXT DEFAULT 'draft'",
-                "page_views": "INTEGER DEFAULT 0",
-                "created_at": "TEXT",
-                "published_at": "TEXT"
-            }
-        }
-
-        for table, columns in migrations.items():
-            existing = {
-                row["name"]
-                for row in con.execute(f"PRAGMA table_info({table})")
-            }
-            for column, definition in columns.items():
-                if column not in existing:
-                    con.execute(
-                        f"ALTER TABLE {table} ADD COLUMN {column} {definition}"
-                    )
-
-        if ADMIN_EMAIL:
-            con.execute(
-                "UPDATE users SET role='admin' WHERE lower(email)=?",
-                (ADMIN_EMAIL,)
-            )
-
-
 init_db()
-
-
-# ---------------- DESIGN ----------------
-
-STYLE = """
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#0b1020;color:#edf2ff;font-family:Arial,sans-serif}
-a{color:#8ab4ff;text-decoration:none}
-button,.btn{border:0;border-radius:10px;padding:12px 18px;background:#6d5dfc;color:white;font-weight:bold;cursor:pointer;display:inline-block}
-input,textarea,select{width:100%;padding:12px;margin:7px 0 15px;border:1px solid #303b56;border-radius:9px;background:#111a30;color:white}
-textarea{min-height:100px}
-label{font-size:14px;color:#c7d2e8}
-nav{display:flex;justify-content:space-between;align-items:center;padding:18px 5%;border-bottom:1px solid #26314a;gap:12px;flex-wrap:wrap}
-.logo{font-size:22px;font-weight:900;color:white}
-.container{width:min(1100px,92%);margin:35px auto}
-.hero{padding:60px 22px;text-align:center;background:linear-gradient(135deg,#17264b,#281c55);border:1px solid #35436a;border-radius:22px}
-.hero h1{font-size:clamp(32px,6vw,58px)}
-.muted{color:#9eabc5;line-height:1.6}
-.card{background:#121c32;border:1px solid #283651;border-radius:16px;padding:22px;margin:15px 0}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-.stat{font-size:30px;font-weight:900;margin-top:8px}
-table{width:100%;border-collapse:collapse}
-td,th{text-align:left;padding:11px;border-bottom:1px solid #2b3853}
-.preview{background:white;color:#172033;border-radius:14px;overflow:hidden}
-.editor-grid{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:20px}
-.flash{background:#25385a;padding:12px;border-radius:8px;margin:10px 0}
-@media(max-width:750px){.editor-grid{grid-template-columns:1fr}.hero{padding:40px 16px}}
-</style>
-"""
-
-
-def page(body, title="TrackGrow", **context):
-    return render_template_string("""
-    <!doctype html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>{{ title }}</title>
-    """ + STYLE + """
-    </head>
-    <body>
-        <nav>
-            <a class="logo" href="/">TrackGrow</a>
-            <span>
-            {% if email %}
-                {{ email }} · <a href="/dashboard">Dashboard</a> ·
-                <a href="/logout">Logout</a>
-            {% else %}
-                <a href="/login">Login</a> ·
-                <a href="/register">Create Account</a>
-            {% endif %}
-            </span>
-        </nav>
-        <main class="container">
-            {% with messages = get_flashed_messages() %}
-                {% for message in messages %}
-                    <div class="flash">{{ message }}</div>
-                {% endfor %}
-            {% endwith %}
-            {{ body|safe }}
-        </main>
-    </body>
-    </html>
-    """, title=title, body=body, email=session.get("email"), **context)
-
 
 def login_required(fn):
     @wraps(fn)
@@ -186,701 +55,104 @@ def login_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
-
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get("user_id"):
-            return redirect(url_for("login"))
-        with db() as con:
-            user = con.execute(
-                "SELECT role FROM users WHERE id=?",
-                (session["user_id"],)
-            ).fetchone()
-        if not user or user["role"] != "admin":
-            abort(403)
-        return fn(*args, **kwargs)
-    return wrapper
-
-
-def default_page_data():
-    return {
-        "title": "Grow Your Business With Us",
-        "subtitle": "Create a powerful first impression and turn visitors into customers.",
-        "button_text": "Join Now",
-        "button_url": "https://t.me/",
-        "background": "#111827",
-        "text_color": "#ffffff",
-        "custom_html": "",
-        "custom_css": "",
-        "custom_js": ""
-    }
-
-
-# ---------------- HOME ----------------
+STYLE = """
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#eaf0ff;font:15px Arial,sans-serif}
+a{color:#7dd3fc;text-decoration:none}.wrap{max-width:1000px;margin:auto;padding:22px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid #27324a}
+.logo{font-size:22px;font-weight:800;color:#fff}.muted{color:#9aa8c2}
+.card{background:#121b30;border:1px solid #263653;border-radius:16px;padding:20px;margin:14px 0}
+input,textarea{width:100%;padding:12px;margin:7px 0 14px;border-radius:9px;border:1px solid #344563;background:#0c1426;color:#fff}
+button,.btn{display:inline-block;background:#16a37a;color:white;border:0;padding:12px 17px;border-radius:9px;font-weight:700;cursor:pointer}
+.btn2{background:#263653}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+h1{font-size:34px;margin:12px 0}h2{margin-top:0}.stat{font-size:28px;font-weight:800}.flash{background:#49351b;padding:10px;border-radius:8px}
+label{color:#b9c7df;font-size:13px}.hero{max-width:720px;margin:70px auto;text-align:center;padding:30px}
+.hero h1{font-size:42px}.hero p{font-size:18px;line-height:1.6;color:#bdc9df}
+small{color:#9aa8c2}
+</style>
+"""
+def page(body, title="TrackGrow"):
+    return render_template_string("""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{title}}</title>""" + STYLE + """</head><body><nav><a class="logo" href="/">TrackGrow</a><span>{% if email %}{{email}} · <a href="/logout">Logout</a>{% else %}<a href="/login">Login</a>{% endif %}</span></nav><main class="wrap">""" + body + """</main></body></html>""",
+        title=title, email=session.get("email"))
 
 @app.route("/")
 def home():
-    body = """
-    <section class="hero">
-        <p>SMART LANDING PAGE & CAMPAIGN TRACKING PLATFORM</p>
-        <h1>Track Every Click.<br>Measure Every Join.</h1>
-        <p class="muted">Build professional landing pages, publish tracking links and understand which campaigns bring visitors.</p>
-        <p>
-            <a class="btn" href="/register">Create Free Account</a>
-            <a class="btn" href="/login">Client Login</a>
-        </p>
-    </section>
-    <div class="grid">
-        <div class="card"><h3>Landing Page Builder</h3><p class="muted">Create and customize landing pages.</p></div>
-        <div class="card"><h3>Campaign Tracking</h3><p class="muted">Track page visits and campaign sources.</p></div>
-        <div class="card"><h3>Analytics Dashboard</h3><p class="muted">Monitor your page performance.</p></div>
-    </div>
-    """
-    return page(body, "TrackGrow")
+    return page("""<section class="hero"><div class="muted">SMART TELEGRAM GROWTH TRACKING</div><h1>Track Every Click.<br>Measure Every Join.</h1><p>Create campaign landing pages, share unique tracking links and understand which campaigns bring visitors to your Telegram channel.</p><a class="btn" href="/register">Create free account</a> <a class="btn btn2" href="/login">Client login</a><p><small>Early MVP · Telegram membership verification will be connected in a later setup step.</small></p></section>""", "TrackGrow — Smart Tracking")
 
-
-# ---------------- REGISTER ----------------
-
-@app.route("/register", methods=["GET", "POST"])
+@app.route("/register", methods=["GET","POST"])
 def register():
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").lower().strip()
-        password = request.form.get("password", "")
-
-        if not name or not email or len(password) < 6:
-            flash("Please enter your name, email and a password of at least 6 characters.")
+        email=request.form.get("email","").strip().lower()
+        password=request.form.get("password","")
+        if not email or len(password)<8:
+            flash("Enter a valid email and password with at least 8 characters.")
         else:
-            role = "admin" if ADMIN_EMAIL and email == ADMIN_EMAIL else "user"
             try:
                 with db() as con:
-                    con.execute("""
-                        INSERT INTO users(name,email,password,role)
-                        VALUES(?,?,?,?)
-                    """, (name, email, generate_password_hash(password), role))
-                flash("Account created. Please login.")
+                    con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)",(email,generate_password_hash(password)))
+                flash("Account created. Please log in.")
                 return redirect(url_for("login"))
             except sqlite3.IntegrityError:
-                flash("This email is already registered.")
+                flash("That email is already registered.")
+    return page("""<div class="card"><h2>Create client account</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password (minimum 8 characters)</label><input name="password" type="password" minlength="8" required><button>Create account</button></form></div>""","Register")
 
-    body = """
-    <div class="card" style="max-width:480px;margin:auto">
-        <h2>Create Your Account</h2>
-        <form method="post">
-            <label>Name</label><input name="name" required>
-            <label>Email</label><input type="email" name="email" required>
-            <label>Password</label><input type="password" name="password" minlength="6" required>
-            <button type="submit">Create Account</button>
-        </form>
-        <p class="muted">Already registered? <a href="/login">Login</a></p>
-    </div>
-    """
-    return page(body, "Register")
-
-
-# ---------------- LOGIN ----------------
-
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
-    if request.method == "POST":
-        email = request.form.get("email", "").lower().strip()
-        password = request.form.get("password", "")
-
-        with db() as con:
-            user = con.execute(
-                "SELECT * FROM users WHERE lower(email)=?",
-                (email,)
-            ).fetchone()
-
-        if user and check_password_hash(user["password"], password):
-            session.clear()
-            session["user_id"] = user["id"]
-            session["email"] = user["email"]
+    if request.method=="POST":
+        email=request.form.get("email","").strip().lower()
+        with db() as con: user=con.execute("SELECT * FROM users WHERE email=?",(email,)).fetchone()
+        if user and check_password_hash(user["password_hash"],request.form.get("password","")):
+            session["user_id"]=user["id"]; session["email"]=user["email"]
             return redirect(url_for("dashboard"))
-
-        flash("Incorrect email or password.")
-
-    body = """
-    <div class="card" style="max-width:480px;margin:auto">
-        <h2>Client Login</h2>
-        <form method="post">
-            <label>Email</label><input type="email" name="email" required>
-            <label>Password</label><input type="password" name="password" required>
-            <button type="submit">Login</button>
-        </form>
-        <p class="muted">New user? <a href="/register">Create account</a></p>
-    </div>
-    """
-    return page(body, "Login")
-
+        flash("Email or password is incorrect.")
+    return page("""<div class="card"><h2>Client login</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password</label><input name="password" type="password" required><button>Login</button></form><p><a href="/register">Create an account</a></p></div>""","Login")
 
 @app.route("/logout")
 def logout():
-    session.clear()
-    return redirect(url_for("home"))
-
-
-# ---------------- DASHBOARD ----------------
+    session.clear(); return redirect(url_for("home"))
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
     with db() as con:
-        user = con.execute(
-            "SELECT * FROM users WHERE id=?",
-            (session["user_id"],)
-        ).fetchone()
+        campaigns=con.execute("SELECT * FROM campaigns WHERE user_id=? ORDER BY id DESC",(session["user_id"],)).fetchall()
+        totals=con.execute("SELECT COUNT(*) n FROM events e JOIN campaigns c ON c.id=e.campaign_id WHERE c.user_id=? AND e.event_type='click'",(session["user_id"],)).fetchone()["n"]
+    rows="".join(f"""<div class="card"><h3>{c['name']}</h3><p class="muted">{c['clicks']} tracked clicks · Telegram: {c['channel_url']}</p><p><a href="/c/{c['slug']}" target="_blank">Open landing page</a> · <a href="/t/{c['slug']}" target="_blank">Tracking link</a></p></div>""" for c in campaigns)
+    return page(f"""<h1>Client Dashboard</h1><p class="muted">Your campaign workspace</p><div class="grid"><div class="card"><div class="muted">Tracked clicks</div><div class="stat">{totals}</div></div><div class="card"><div class="muted">Campaigns</div><div class="stat">{len(campaigns)}</div></div><div class="card"><div class="muted">Verified Telegram joins</div><div class="stat">—</div><small>Not connected yet</small></div></div><div class="card"><h2>Create a landing page & campaign</h2><form method="post" action="/campaigns/new"><label>Campaign name</label><input name="name" required placeholder="Example: Instagram November Campaign"><label>Telegram channel invite URL</label><input name="channel_url" type="url" required placeholder="https://t.me/+..."><label>Landing page headline</label><input name="headline" required value="Join our Telegram community"><label>Description</label><textarea name="description" rows="3">Get updates and community announcements on Telegram.</textarea><label>Button text</label><input name="button_text" value="Join on Telegram"><button>Create campaign</button></form></div><h2>Your campaigns</h2>{rows or '<p class="muted">No campaigns yet. Create your first one above.</p>'}""","Dashboard")
 
-        pages = con.execute(
-            "SELECT * FROM pages WHERE user_id=? ORDER BY id DESC",
-            (session["user_id"],)
-        ).fetchall()
-
-        views = con.execute(
-            "SELECT COALESCE(SUM(page_views),0) AS total FROM pages WHERE user_id=?",
-            (session["user_id"],)
-        ).fetchone()["total"]
-
-    rows = ""
-    for p in pages:
-        rows += f"""
-        <tr>
-            <td>{escape(p['title'] or '')}</td>
-            <td>{escape(p['status'] or 'draft')}</td>
-            <td>{p['page_views'] or 0}</td>
-            <td><a href="/editor/{p['slug']}">Edit</a> ·
-            <a href="/p/{p['slug']}" target="_blank">View</a></td>
-        </tr>
-        """
-
-    if not rows:
-        rows = "<tr><td colspan='4'>No pages created yet.</td></tr>"
-
-    body = f"""
-    <h1>Dashboard</h1>
-    <p class="muted">Welcome, {escape(user['name'] or user['email'])}</p>
-    <div class="grid">
-        <div class="card">Your Plan<div class="stat">{escape(user['plan'].title())}</div></div>
-        <div class="card">Landing Pages<div class="stat">{len(pages)}</div></div>
-        <div class="card">Total Views<div class="stat">{views}</div></div>
-    </div>
-    <p><a class="btn" href="/templates">+ Create Landing Page</a>
-    <a class="btn" href="/pricing">View Plans</a></p>
-    <div class="card">
-        <h2>Your Landing Pages</h2>
-        <table>
-            <tr><th>Page</th><th>Status</th><th>Views</th><th>Actions</th></tr>
-            {rows}
-        </table>
-    </div>
-    """
-    return page(body, "Dashboard")
-
-
-# ---------------- TEMPLATES ----------------
-
-@app.route("/templates")
+@app.route("/campaigns/new", methods=["POST"])
 @login_required
-def templates():
-    body = """
-    <h1>Choose a Template</h1>
-    <div class="grid">
-        <div class="card"><h2>Business</h2><p class="muted">Professional business page.</p><a class="btn" href="/create/business">Use Template</a></div>
-        <div class="card"><h2>Telegram</h2><p class="muted">Promote your Telegram channel.</p><a class="btn" href="/create/telegram">Use Template</a></div>
-        <div class="card"><h2>Product</h2><p class="muted">Promote your product or service.</p><a class="btn" href="/create/product">Use Template</a></div>
-    </div>
-    """
-    return page(body, "Templates")
-
-
-@app.route("/create/<template_id>")
-@login_required
-def create_page(template_id):
-    if template_id not in ("business", "telegram", "product"):
-        abort(404)
-
-    data = default_page_data()
-    if template_id == "telegram":
-        data["title"] = "Join Our Telegram Community"
-        data["subtitle"] = "Get updates and useful information directly on Telegram."
-        data["button_text"] = "Join Telegram"
-    elif template_id == "product":
-        data["title"] = "Discover Our Product"
-        data["subtitle"] = "Explore our product and get started today."
-        data["button_text"] = "Get Started"
-
-    slug = secrets.token_hex(12)
+def new_campaign():
+    name=request.form.get("name","").strip()
+    channel=request.form.get("channel_url","").strip()
+    if not channel.startswith("https://t.me/"):
+        flash("Please enter a valid https://t.me/ Telegram invite or channel URL.")
+        return redirect(url_for("dashboard"))
+    slug=secrets.token_urlsafe(7).replace("-","").replace("_","")[:10]
     with db() as con:
-        con.execute("""
-            INSERT INTO pages(user_id,title,slug,template_id,page_data,status)
-            VALUES(?,?,?,?,?,'draft')
-        """, (
-            session["user_id"], data["title"], slug,
-            template_id, json.dumps(data)
-        ))
-
-    return redirect(url_for("edit_page", slug=slug))
-
-
-# ---------------- EDITOR ----------------
-
-@app.route("/editor/<slug>", methods=["GET", "POST"])
-@login_required
-def edit_page(slug):
-    with db() as con:
-        p = con.execute(
-            "SELECT * FROM pages WHERE slug=? AND user_id=?",
-            (slug, session["user_id"])
-        ).fetchone()
-
-    if not p:
-        abort(404)
-
-    try:
-        data = json.loads(p["page_data"] or "{}")
-    except (TypeError, json.JSONDecodeError):
-        data = default_page_data()
-
-    for key, value in default_page_data().items():
-        data.setdefault(key, value)
-
-    if request.method == "POST":
-        for key in (
-            "title", "subtitle", "button_text", "button_url",
-            "background", "text_color", "custom_html",
-            "custom_css", "custom_js"
-        ):
-            if key in request.form:
-                data[key] = request.form.get(key, "")
-
-        with db() as con:
-            con.execute(
-                "UPDATE pages SET title=?,page_data=? WHERE slug=? AND user_id=?",
-                (data["title"], json.dumps(data), slug, session["user_id"])
-            )
-
-        flash("Changes saved successfully.")
-
-    body = """
-    <h1>Landing Page Editor</h1>
-    <p class="muted">Customize your page, save and publish it.</p>
-
-    <div class="editor-grid">
-        <div class="card">
-            <form method="post">
-                <h3>Page Content</h3>
-                <label>Headline</label>
-                <input name="title" id="titleInput" value="{{ data.title }}">
-                <label>Description</label>
-                <textarea name="subtitle" id="subtitleInput">{{ data.subtitle }}</textarea>
-                <label>Button Text</label>
-                <input name="button_text" id="buttonInput" value="{{ data.button_text }}">
-                <label>Button Link</label>
-                <input name="button_url" value="{{ data.button_url }}">
-                <label>Background Color</label>
-                <input type="color" name="background" id="bgInput" value="{{ data.background }}">
-                <label>Text Color</label>
-                <input type="color" name="text_color" value="{{ data.text_color }}">
-                <hr>
-                <h3>Custom HTML</h3>
-                <textarea name="custom_html" rows="5">{{ data.custom_html }}</textarea>
-                <h3>Custom CSS</h3>
-                <textarea name="custom_css" rows="5">{{ data.custom_css }}</textarea>
-                <h3>Custom JavaScript</h3>
-                <textarea name="custom_js" rows="5">{{ data.custom_js }}</textarea>
-                <button type="submit">Save Changes</button>
-            </form>
-            <hr>
-            <form method="post" action="/publish/{{ slug }}">
-                <button type="submit">Publish Landing Page</button>
-            </form>
-            <p><a href="/dashboard">Back to Dashboard</a></p>
-        </div>
-
-        <div class="card">
-            <h3>Live Preview</h3>
-            <div class="preview" id="preview-page">
-                <div style="padding:55px 20px;text-align:center" id="preview-content">
-                    <h1 id="preview-title">{{ data.title }}</h1>
-                    <p id="preview-subtitle">{{ data.subtitle }}</p>
-                    <span id="preview-button" style="display:inline-block;padding:13px 22px;background:#635bff;color:white;border-radius:8px">{{ data.button_text }}</span>
-                </div>
-            </div>
-            <p><a href="/p/{{ slug }}" target="_blank">Open Public Page</a></p>
-        </div>
-    </div>
-
-    <script>
-    document.getElementById("titleInput").addEventListener("input", function(){
-        document.getElementById("preview-title").textContent = this.value;
-    });
-    document.getElementById("subtitleInput").addEventListener("input", function(){
-        document.getElementById("preview-subtitle").textContent = this.value;
-    });
-    document.getElementById("buttonInput").addEventListener("input", function(){
-        document.getElementById("preview-button").textContent = this.value;
-    });
-    document.getElementById("bgInput").addEventListener("input", function(){
-        document.getElementById("preview-page").style.background = this.value;
-    });
-    </script>
-    """
-    return page(body, "Page Editor", data=data, slug=slug)
-    # ---------------- PUBLISH PAGE ----------------
-
-@app.route("/publish/<slug>", methods=["POST"])
-@login_required
-def publish_page(slug):
-    with db() as con:
-        p = con.execute(
-            "SELECT * FROM pages WHERE slug=? AND user_id=?",
-            (slug, session["user_id"])
-        ).fetchone()
-
-        if not p:
-            abort(404)
-
-        con.execute("""
-            UPDATE pages
-            SET status='published', published_at=CURRENT_TIMESTAMP
-            WHERE slug=? AND user_id=?
-        """, (slug, session["user_id"]))
-
-    flash("Your landing page is published.")
-    return redirect(url_for("edit_page", slug=slug))
-
-
-# ---------------- PUBLIC PAGE ----------------
-
-@app.route("/p/<slug>")
-def public_page(slug):
-    with db() as con:
-        p = con.execute(
-            "SELECT * FROM pages WHERE slug=? AND status='published'",
-            (slug,)
-        ).fetchone()
-
-        if not p:
-            abort(404)
-
-        con.execute(
-            "UPDATE pages SET page_views=COALESCE(page_views,0)+1 WHERE id=?",
-            (p["id"],)
-        )
-
-        source = request.args.get("utm_source", "")[:150]
-        con.execute("""
-            INSERT INTO events(page_id,event_type,source)
-            VALUES(?,?,?)
-        """, (p["id"], "page_view", source))
-
-    try:
-        data = json.loads(p["page_data"] or "{}")
-    except (TypeError, json.JSONDecodeError):
-        data = default_page_data()
-
-    for key, value in default_page_data().items():
-        data.setdefault(key, value)
-
-    title = escape(data["title"])
-    subtitle = escape(data["subtitle"])
-    button_text = escape(data["button_text"])
-    button_url = escape(data["button_url"])
-    background = escape(data["background"])
-    text_color = escape(data["text_color"])
-
-    body = f"""
-    <div style="min-height:70vh;background:{background};color:{text_color};
-    border-radius:18px;padding:65px 20px;text-align:center">
-        <div style="max-width:850px;margin:auto">
-            <h1 style="font-size:clamp(32px,6vw,58px)">{title}</h1>
-            <p style="font-size:18px;line-height:1.7">{subtitle}</p>
-            <a href="{button_url}" target="_blank" rel="noopener noreferrer"
-            style="display:inline-block;margin-top:20px;padding:15px 28px;
-            background:#6d5dfc;color:white;border-radius:10px;
-            text-decoration:none;font-weight:bold">{button_text}</a>
-        </div>
-    </div>
-    """
-
-    custom_html = data.get("custom_html", "")
-    custom_css = data.get("custom_css", "")
-    custom_js = data.get("custom_js", "")
-
-    if custom_html or custom_css or custom_js:
-        custom_document = (
-            '<!doctype html><html><head><meta name="viewport" '
-            'content="width=device-width,initial-scale=1"><style>'
-            + custom_css +
-            '</style></head><body>'
-            + custom_html +
-            '<script>' + custom_js + '</script></body></html>'
-        )
-
-        body += """
-        <div style="margin-top:25px;background:white;border-radius:14px;overflow:hidden">
-            <iframe
-                title="Custom page content"
-                sandbox="allow-scripts"
-                referrerpolicy="no-referrer"
-                style="width:100%;min-height:450px;border:0"
-                srcdoc="""" + str(escape(custom_document)) + """">
-            </iframe>
-        </div>
-        """
-
-    body += """
-    <p style="text-align:center;color:#9eabc5;margin-top:25px">
-        Powered by TrackGrow
-    </p>
-    """
-
-    return page(body, p["title"])
-
-
-# ---------------- PRICING ----------------
-
-@app.route("/pricing")
-@login_required
-def pricing():
-    body = """
-    <h1>Choose Your Plan</h1>
-    <p class="muted">Select a plan for your business.</p>
-
-    <div class="grid">
-        <div class="card">
-            <h2>Free</h2>
-            <div class="stat">₹0</div>
-            <p class="muted">For getting started.</p>
-            <ul>
-                <li>Landing page builder</li>
-                <li>Basic page analytics</li>
-                <li>Publish landing pages</li>
-            </ul>
-            <a class="btn" href="/dashboard">Free Access</a>
-        </div>
-
-        <div class="card">
-            <h2>Starter</h2>
-            <div class="stat">₹499</div>
-            <ul>
-                <li>Landing page builder</li>
-                <li>Campaign tracking</li>
-                <li>Page analytics</li>
-            </ul>
-            <form method="post" action="/request-plan">
-                <input type="hidden" name="plan" value="starter">
-                <input type="hidden" name="amount" value="499">
-                <button type="submit">Request Starter</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h2>Pro</h2>
-            <div class="stat">₹999</div>
-            <ul>
-                <li>All Starter features</li>
-                <li>Advanced campaign tools</li>
-                <li>Priority support</li>
-            </ul>
-            <form method="post" action="/request-plan">
-                <input type="hidden" name="plan" value="pro">
-                <input type="hidden" name="amount" value="999">
-                <button type="submit">Request Pro</button>
-            </form>
-        </div>
-    </div>
-
-    <p class="muted">
-        Online payment gateway is not connected yet.
-        Plan requests require manual admin approval.
-    </p>
-    """
-    return page(body, "Pricing")
-
-
-# ---------------- PLAN REQUEST ----------------
-
-@app.route("/request-plan", methods=["POST"])
-@login_required
-def request_plan():
-    plan = request.form.get("plan", "").lower().strip()
-    amount = request.form.get("amount", "").strip()
-
-    allowed = {"starter": "499", "pro": "999"}
-
-    if plan not in allowed or amount != allowed[plan]:
-        abort(400)
-
-    with db() as con:
-        con.execute("""
-            INSERT INTO plan_requests(user_id,plan,amount,status)
-            VALUES(?,?,?,'pending')
-        """, (session["user_id"], plan, amount))
-
-    flash("Your plan request has been submitted.")
+        con.execute("""INSERT INTO campaigns(user_id,name,slug,channel_url,headline,description,button_text)
+        VALUES(?,?,?,?,?,?,?)""",(session["user_id"],name,slug,channel,request.form.get("headline","Join our Telegram community"),request.form.get("description",""),request.form.get("button_text","Join on Telegram")))
     return redirect(url_for("dashboard"))
 
+@app.route("/c/<slug>")
+def landing(slug):
+    with db() as con: c=con.execute("SELECT * FROM campaigns WHERE slug=?",(slug,)).fetchone()
+    if not c: abort(404)
+    return page(f"""<section class="hero"><div class="muted">WELCOME</div><h1>{c['headline']}</h1><p>{c['description']}</p><a class="btn" href="/t/{slug}">{c['button_text']}</a></section>""",c["name"])
 
-# ---------------- ADMIN DASHBOARD ----------------
-
-@app.route("/admin")
-@login_required
-@admin_required
-def admin():
+@app.route("/t/<slug>")
+def track(slug):
     with db() as con:
-        users = con.execute("""
-            SELECT id,name,email,role,plan
-            FROM users ORDER BY id DESC
-        """).fetchall()
+        c=con.execute("SELECT * FROM campaigns WHERE slug=?",(slug,)).fetchone()
+        if not c: abort(404)
+        source=request.args.get("utm_source") or request.args.get("src") or "direct"
+        con.execute("UPDATE campaigns SET clicks=clicks+1 WHERE id=?",(c["id"],))
+        con.execute("INSERT INTO events(campaign_id,event_type,source) VALUES(?,?,?)",(c["id"],"click",source))
+    return redirect(c["channel_url"])
 
-        requests = con.execute("""
-            SELECT plan_requests.*,users.name,users.email
-            FROM plan_requests
-            JOIN users ON users.id=plan_requests.user_id
-            ORDER BY plan_requests.id DESC
-        """).fetchall()
+@app.route("/health")
+def health():
+    return {"status":"ok","app":"TrackGrow","note":"MVP running; Telegram verified-join webhook is not configured yet."}
 
-        total_pages = con.execute(
-            "SELECT COUNT(*) AS n FROM pages"
-        ).fetchone()["n"]
-
-        total_views = con.execute(
-            "SELECT COALESCE(SUM(page_views),0) AS n FROM pages"
-        ).fetchone()["n"]
-
-    user_rows = ""
-    for u in users:
-        user_rows += f"""
-        <tr>
-            <td>{u['id']}</td>
-            <td>{escape(u['name'] or '')}</td>
-            <td>{escape(u['email'])}</td>
-            <td>{escape(u['role'])}</td>
-            <td>{escape(u['plan'])}</td>
-        </tr>
-        """
-
-    request_rows = ""
-    for r in requests:
-        action = ""
-        if r["status"] == "pending":
-            action = f"""
-            <form method="post" action="/admin/approve/{r['id']}">
-                <button type="submit">Approve</button>
-            </form>
-            """
-
-        request_rows += f"""
-        <tr>
-            <td>{escape(r['name'] or '')}</td>
-            <td>{escape(r['email'])}</td>
-            <td>{escape(r['plan'])}</td>
-            <td>₹{escape(r['amount'])}</td>
-            <td>{escape(r['status'])}</td>
-            <td>{action}</td>
-        </tr>
-        """
-
-    if not user_rows:
-        user_rows = "<tr><td colspan='5'>No users found.</td></tr>"
-
-    if not request_rows:
-        request_rows = "<tr><td colspan='6'>No plan requests found.</td></tr>"
-
-    body = f"""
-    <h1>Admin Dashboard</h1>
-
-    <div class="grid">
-        <div class="card">Total Users<div class="stat">{len(users)}</div></div>
-        <div class="card">Total Pages<div class="stat">{total_pages}</div></div>
-        <div class="card">Total Views<div class="stat">{total_views}</div></div>
-    </div>
-
-    <div class="card">
-        <h2>Plan Requests</h2>
-        <table>
-            <tr>
-                <th>Name</th><th>Email</th><th>Plan</th>
-                <th>Amount</th><th>Status</th><th>Action</th>
-            </tr>
-            {request_rows}
-        </table>
-    </div>
-
-    <div class="card">
-        <h2>Registered Users</h2>
-        <table>
-            <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Plan</th></tr>
-            {user_rows}
-        </table>
-    </div>
-    """
-    return page(body, "Admin Dashboard")
-
-
-# ---------------- APPROVE PLAN ----------------
-
-@app.route("/admin/approve/<int:request_id>", methods=["POST"])
-@login_required
-@admin_required
-def approve_plan(request_id):
-    with db() as con:
-        plan_request = con.execute(
-            "SELECT * FROM plan_requests WHERE id=?",
-            (request_id,)
-        ).fetchone()
-
-        if not plan_request:
-            abort(404)
-
-        if plan_request["status"] != "pending":
-            flash("This request was already processed.")
-            return redirect(url_for("admin"))
-
-        con.execute("""
-            UPDATE users SET plan=?,plan_status='active'
-            WHERE id=?
-        """, (plan_request["plan"], plan_request["user_id"]))
-
-        con.execute("""
-            UPDATE plan_requests SET status='approved'
-            WHERE id=?
-        """, (request_id,))
-
-    flash("Plan approved successfully.")
-    return redirect(url_for("admin"))
-
-
-# ---------------- ERROR PAGES ----------------
-
-@app.errorhandler(403)
-def forbidden(error):
-    return page("""
-    <div class="card">
-        <h1>403 - Access Denied</h1>
-        <p>You do not have permission to access this page.</p>
-        <a class="btn" href="/dashboard">Dashboard</a>
-    </div>
-    """, "Access Denied"), 403
-
-
-@app.errorhandler(404)
-def not_found(error):
-    return page("""
-    <div class="card">
-        <h1>404 - Page Not Found</h1>
-        <p>The page you are looking for does not exist.</p>
-        <a class="btn" href="/">Go Home</a>
-    </div>
-    """, "Page Not Found"), 404
-
-
-# ---------------- START APPLICATION ----------------
-
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000))
-    )
+if __name__=="__main__":
+    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
