@@ -716,6 +716,57 @@ def edit_page(slug):
        .replace("{{button_url}}", data.get("button_url", ""))
        .replace("{{bg_color}}", data.get("bg_color", "#101b32")),
        "Landing Page Editor")
+@app.route("/publish/<slug>", methods=["POST"])
+@login_required
+def publish_page(slug):
+    with db() as con:
+        p = con.execute(
+            "SELECT * FROM pages WHERE slug=? AND user_id=?",
+            (slug, session["user_id"])
+        ).fetchone()
 
+        if not p:
+            abort(404)
+
+        con.execute("""
+            UPDATE pages
+            SET status='published', published_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        """, (p["id"],))
+
+    flash("Your landing page is now published!")
+    return redirect(url_for("edit_page", slug=slug))
+
+
+@app.route("/p/<slug>")
+def public_page(slug):
+    from markupsafe import escape
+
+    with db() as con:
+        p = con.execute(
+            "SELECT * FROM pages WHERE slug=? AND status='published'",
+            (slug,)
+        ).fetchone()
+
+    if not p:
+        abort(404)
+
+    data = json.loads(p["page_data"] or "{}")
+
+    headline = escape(data.get("headline", p["title"]))
+    description = escape(data.get("description", ""))
+    button_text = escape(data.get("button_text", "Get Started"))
+
+    button_url = data.get("button_url", "")
+    if not button_url.startswith(("https://", "http://")):
+        button_url = "#"
+
+    return page(f"""
+    <section class="hero">
+        <h1>{headline}</h1>
+        <p>{description}</p>
+        <a class="btn" href="{escape(button_url)}">{button_text}</a>
+    </section>
+    """, escape(p["title"]))
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
