@@ -156,6 +156,98 @@ def page(body, title="TrackGrow"):
 
 @app.route("/")
 def home():
+    return page("""
+    <section class="hero">
+        <div style="display:inline-block;background:#17264a;color:#9db5ff;padding:9px 16px;border-radius:30px;font-size:13px;font-weight:bold;">
+            ✦ ALL-IN-ONE LANDING PAGE PLATFORM
+        </div>
+
+        <h1>Build Landing Pages.<br>
+        <span style="color:#829aff;">Grow Your Business.</span></h1>
+
+        <p>Create professional landing pages for your products, services,
+        courses and campaigns — all from one simple platform.</p>
+
+        <a class="btn" href="/register">Start Building Free →</a>
+        <a class="btn btn2" href="/login">Login</a>
+
+        <p><small>No coding required · Simple page management</small></p>
+    </section>
+
+    <section style="text-align:center;margin:65px 0 35px;">
+        <h2>Everything You Need to Build Pages</h2>
+        <p class="muted">One platform to create, manage and grow your online presence.</p>
+    </section>
+
+    <div class="grid">
+        <div class="card">
+            <div style="font-size:32px;">🎨</div>
+            <h3>Professional Templates</h3>
+            <p class="muted">Choose from landing page designs for different business needs.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:32px;">⚡</div>
+            <h3>Easy Page Creation</h3>
+            <p class="muted">Create and manage your landing pages from one dashboard.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:32px;">📊</div>
+            <h3>Campaign Tracking</h3>
+            <p class="muted">Track campaign clicks and understand your traffic.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:32px;">📱</div>
+            <h3>Mobile Friendly</h3>
+            <p class="muted">Build pages designed to look good on mobile and desktop.</p>
+        </div>
+    </div>
+
+    <section style="text-align:center;margin:75px 0 30px;">
+        <h2>Explore Landing Page Categories</h2>
+        <p class="muted">Choose a design that matches your business.</p>
+    </section>
+
+    <div class="grid">
+        <div class="card">
+            <div style="font-size:38px;">🛍️</div>
+            <h3>Digital Products</h3>
+            <p class="muted">For eBooks, downloads and online products.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:38px;">🎓</div>
+            <h3>Course & Coaching</h3>
+            <p class="muted">For online courses, mentors and educators.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:38px;">💼</div>
+            <h3>Agency & Services</h3>
+            <p class="muted">For agencies, freelancers and service providers.</p>
+        </div>
+
+        <div class="card">
+            <div style="font-size:38px;">🚀</div>
+            <h3>Telegram Promotion</h3>
+            <p class="muted">For Telegram channels and campaign promotions.</p>
+        </div>
+    </div>
+
+    <section class="card" style="text-align:center;margin:75px 0;padding:45px 20px;">
+        <h2>Ready to Build Your First Landing Page?</h2>
+        <p class="muted">Join TrackGrow and start creating your online pages.</p>
+        <a class="btn" href="/register">Get Started Now →</a>
+    </section>
+
+    <footer style="text-align:center;padding:25px;border-top:1px solid #263650;">
+        <strong>TrackGrow</strong>
+        <p class="muted">Build. Publish. Grow.</p>
+        <small>© 2026 TrackGrow. All rights reserved.</small>
+    </footer>
+    """, "TrackGrow — Landing Page Builder")
     return page("""<section class="hero"><div class="muted">SMART TELEGRAM GROWTH TRACKING</div><h1>Track Every Click.<br>Measure Every Join.</h1><p>Create campaign landing pages, share unique tracking links and understand which campaigns bring visitors to your Telegram channel.</p><a class="btn" href="/register">Create free account</a> <a class="btn btn2" href="/login">Client login</a><p><small>Early MVP · Telegram membership verification will be connected in a later setup step.</small></p></section>""", "TrackGrow — Smart Tracking")
 
 @app.route("/register", methods=["GET", "POST"])
