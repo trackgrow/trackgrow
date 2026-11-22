@@ -117,8 +117,8 @@ def dashboard():
     with db() as con:
         campaigns=con.execute("SELECT * FROM campaigns WHERE user_id=? ORDER BY id DESC",(session["user_id"],)).fetchall()
         totals=con.execute("SELECT COUNT(*) n FROM events e JOIN campaigns c ON c.id=e.campaign_id WHERE c.user_id=? AND e.event_type='click'",(session["user_id"],)).fetchone()["n"]
-                        con.execute("""
-            CREATE TABLE IF NOT EXISTS telegram_members (
+
+            con.execute("""        CREATE TABLE IF NOT EXISTS telegram_members (
                 chat_id TEXT NOT NULL,
                 telegram_user_id INTEGER NOT NULL,
                 username TEXT,
