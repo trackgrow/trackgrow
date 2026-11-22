@@ -169,6 +169,7 @@ def telegram_webhook():
 
     if member:
         chat = member.get("chat", {})
+        print("TRACKGROW_CHANNEL_ID:", chat.get("id"))
         new_member = member.get("new_chat_member", {})
         user = new_member.get("user", {})
         status = new_member.get("status", "left")
