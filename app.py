@@ -268,6 +268,82 @@ def logout():
 
 
 
+@app.route("/pages/new", methods=["GET", "POST"])
+@login_required
+def new_page():
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        template_id = request.form.get("template_id", "basic")
+
+        if not title:
+            flash("Please enter a page title.")
+            return redirect(url_for("new_page"))
+
+        slug = secrets.token_hex(4)
+
+        with db() as con:
+            con.execute("""
+                INSERT INTO pages
+                (user_id, title, slug, template_id, page_data)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                session["user_id"],
+                title,
+                slug,
+                template_id,
+                "{}"
+            ))
+
+        flash("Landing page created successfully!")
+        return redirect(url_for("dashboard"))
+
+    return page("""
+    <h1>Choose Your Landing Page Template</h1>
+    <p class="muted">Select a design to get started.</p>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Digital Product</h2>
+            <p>For ebooks, PDFs and digital downloads.</p>
+            <form method="post">
+                <input name="title" placeholder="Page title" required>
+                <input type="hidden" name="template_id" value="digital">
+                <button type="submit">Choose Template</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Course & Coaching</h2>
+            <p>For online courses and coaching services.</p>
+            <form method="post">
+                <input name="title" placeholder="Page title" required>
+                <input type="hidden" name="template_id" value="course">
+                <button type="submit">Choose Template</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Agency & Services</h2>
+            <p>For agencies and professional services.</p>
+            <form method="post">
+                <input name="title" placeholder="Page title" required>
+                <input type="hidden" name="template_id" value="agency">
+                <button type="submit">Choose Template</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Telegram Promotion</h2>
+            <p>For Telegram channel and community promotion.</p>
+            <form method="post">
+                <input name="title" placeholder="Page title" required>
+                <input type="hidden" name="template_id" value="telegram">
+                <button type="submit">Choose Template</button>
+            </form>
+        </div>
+    </div>
+    """, "Choose Template")
+
 
 @app.route("/campaigns/new", methods=["POST"])
 @login_required
