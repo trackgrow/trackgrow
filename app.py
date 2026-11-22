@@ -154,5 +154,55 @@ def track(slug):
 def health():
     return {"status":"ok","app":"TrackGrow","note":"MVP running; Telegram verified-join webhook is not configured yet."}
 
+@app.route("/telegram/webhook", methods=["POST"])
+def telegram_webhook():
+    secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+
+    if not secret:
+        abort(503)
+
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != secret:
+        abort(403)
+
+    update = request.get_json(silent=True) or {}
+    member = update.get("chat_member")
+
+    if member:
+        chat = member.get("chat", {})
+        new_member = member.get("new_chat_member", {})
+        user = new_member.get("user", {})
+        status = new_member.get("status", "left")
+
+        if chat.get("id") and user.get("id"):
+            with db() as con:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS telegram_members (
+                        chat_id TEXT NOT NULL,
+                        telegram_user_id INTEGER NOT NULL,
+                        username TEXT,
+                        status TEXT NOT NULL,
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(chat_id, telegram_user_id)
+                    )
+                """)
+
+                con.execute("""
+                    INSERT INTO telegram_members
+                    (chat_id, telegram_user_id, username, status)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(chat_id, telegram_user_id)
+                    DO UPDATE SET
+                    username=excluded.username,
+                    status=excluded.status,
+                    updated_at=CURRENT_TIMESTAMP
+                """, (
+                    str(chat["id"]),
+                    user["id"],
+                    user.get("username"),
+                    status
+                ))
+
+    return {"ok": True}
+    
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
