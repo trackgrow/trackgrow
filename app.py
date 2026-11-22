@@ -191,6 +191,7 @@ def dashboard():
         f"""<div class="card">
         <h3>{p['title']}</h3>
         <p class="muted">Template: {p['template_id']} · Status: {p['status']}</p>
+                <p><a href="/editor/{p['slug']}">Edit Landing Page</a></p>
         </div>"""
         for p in pages
     )
