@@ -1,4 +1,4 @@
-import os, secrets, sqlite3
+import os, secrets, sqlite3, json
 from functools import wraps
 from urllib.parse import urlencode
 from flask import Flask, request, redirect, url_for, render_template_string, session, flash, abort
@@ -430,6 +430,57 @@ def telegram_webhook():
 
     return {"ok": True}
 
-    
+    @app.route("/editor/<slug>", methods=["GET", "POST"])
+@login_required
+def edit_page(slug):
+    with db() as con:
+        p = con.execute(
+            "SELECT * FROM pages WHERE slug=? AND user_id=?",
+            (slug, session["user_id"])
+        ).fetchone()
+
+        if not p:
+            abort(404)
+
+        data = json.loads(p["page_data"] or "{}")
+
+        if request.method == "POST":
+            title = request.form.get("title", "").strip()
+            data = {
+                "headline": request.form.get("headline", ""),
+                "description": request.form.get("description", ""),
+                "button_text": request.form.get("button_text", "")
+            }
+
+            if title:
+                con.execute(
+                    "UPDATE pages SET title=?, page_data=? WHERE id=?",
+                    (title, json.dumps(data), p["id"])
+                )
+                flash("Landing page updated!")
+                return redirect(url_for("dashboard"))
+
+    return page("""
+    <h1>Edit Landing Page</h1>
+    <form method="post">
+        <label>Page Title</label>
+        <input name="title" value="{{title}}" required>
+
+        <label>Headline</label>
+        <input name="headline" value="{{headline}}" required>
+
+        <label>Description</label>
+        <textarea name="description" required>{{description}}</textarea>
+
+        <label>Button Text</label>
+        <input name="button_text" value="{{button_text}}" required>
+
+        <button type="submit">Save Changes</button>
+    </form>
+    """.replace("{{title}}", p["title"])
+       .replace("{{headline}}", data.get("headline", p["title"]))
+       .replace("{{description}}", data.get("description", "Describe your offer here."))
+       .replace("{{button_text}}", data.get("button_text", "Get Started")),
+       "Edit Landing Page")
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
