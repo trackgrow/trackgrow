@@ -653,12 +653,15 @@ def edit_page(slug):
         if request.method == "POST":
             title = request.form.get("title", "").strip()
 
-            data = {
+                        data = {
                 "headline": request.form.get("headline", ""),
                 "description": request.form.get("description", ""),
                 "button_text": request.form.get("button_text", ""),
                 "button_url": request.form.get("button_url", ""),
-                "bg_color": request.form.get("bg_color", "#101b32")
+                "bg_color": request.form.get("bg_color", "#101b32"),
+                "custom_html": request.form.get("custom_html", ""),
+                "custom_css": request.form.get("custom_css", ""),
+                "custom_js": request.form.get("custom_js", "")
             }
 
             if title:
@@ -731,6 +734,21 @@ def edit_page(slug):
             <div class="tool-item">✦ Headline Section</div>
             <div class="tool-item">▤ Description Section</div>
             <div class="tool-item">▣ Call To Action Button</div>
+            
+<hr style="border-color:#293b55;margin:20px 0;">
+
+<h3>Developer Code Mode</h3>
+<p class="muted">Customize your landing page with your own code.</p>
+
+<label class="editor-label">Custom HTML</label>
+<textarea name="custom_html" rows="6" placeholder="Write your HTML here">{{custom_html}}</textarea>
+
+<label class="editor-label">Custom CSS</label>
+<textarea name="custom_css" rows="6" placeholder="Write your CSS here">{{custom_css}}</textarea>
+
+<label class="editor-label">Custom JavaScript</label>
+<textarea name="custom_js" rows="6" placeholder="Write your JavaScript here">{{custom_js}}</textarea>
+
         </div>
 
         <div>
