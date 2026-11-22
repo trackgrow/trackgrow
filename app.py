@@ -80,20 +80,76 @@ def login_required(fn):
 
 STYLE = """
 <style>
-*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#eaf0ff;font:15px Arial,sans-serif}
-a{color:#7dd3fc;text-decoration:none}.wrap{max-width:1000px;margin:auto;padding:22px}
-nav{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid #27324a}
-.logo{font-size:22px;font-weight:800;color:#fff}.muted{color:#9aa8c2}
-.card{background:#121b30;border:1px solid #263653;border-radius:16px;padding:20px;margin:14px 0}
-input,textarea{width:100%;padding:12px;margin:7px 0 14px;border-radius:9px;border:1px solid #344563;background:#0c1426;color:#fff}
-button,.btn{display:inline-block;background:#16a37a;color:white;border:0;padding:12px 17px;border-radius:9px;font-weight:700;cursor:pointer}
-.btn2{background:#263653}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
-h1{font-size:34px;margin:12px 0}h2{margin-top:0}.stat{font-size:28px;font-weight:800}.flash{background:#49351b;padding:10px;border-radius:8px}
-label{color:#b9c7df;font-size:13px}.hero{max-width:720px;margin:70px auto;text-align:center;padding:30px}
-.hero h1{font-size:42px}.hero p{font-size:18px;line-height:1.6;color:#bdc9df}
+*{box-sizing:border-box}
+body{
+ margin:0;
+ background:#080d19;
+ color:#edf2ff;
+ font:15px Inter,Arial,sans-serif;
+}
+a{color:#8bafff;text-decoration:none}
+a:hover{color:#fff}
+.wrap{max-width:1180px;margin:auto;padding:28px 22px}
+nav{
+ display:flex;justify-content:space-between;align-items:center;
+ padding:18px 5%;border-bottom:1px solid #202b40;
+ background:#0b1220;
+}
+.logo{font-size:25px;font-weight:900;color:#fff;letter-spacing:-1px}
+.muted{color:#9aa9c2}
+.card{
+ background:linear-gradient(145deg,#121d31,#0e1728);
+ border:1px solid #263650;border-radius:18px;
+ padding:24px;margin:16px 0;
+ box-shadow:0 12px 35px #0003;
+}
+input,textarea,select{
+ width:100%;padding:14px;margin:8px 0 16px;
+ border-radius:10px;border:1px solid #34445f;
+ background:#0b1425;color:#fff;font-size:15px;
+}
+input:focus,textarea:focus{
+ outline:2px solid #527cf5;border-color:#527cf5;
+}
+button,.btn{
+ display:inline-block;background:linear-gradient(120deg,#5578ff,#7657e9);
+ color:white;border:0;padding:13px 21px;border-radius:10px;
+ font-weight:750;cursor:pointer;transition:.2s;
+}
+button:hover,.btn:hover{transform:translateY(-2px);filter:brightness(1.12)}
+.btn2{background:#202e47}
+.grid{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+ gap:18px;
+}
+h1{font-size:38px;line-height:1.15;letter-spacing:-1.4px}
+h2{margin-top:0;font-size:24px}
+h3{font-size:19px}
+p{line-height:1.7}
+.stat{font-size:32px;font-weight:900;color:#8ba7ff}
+.flash{
+ background:#49351b;border:1px solid #80602b;
+ padding:13px;border-radius:10px;
+}
+label{color:#b9c7df;font-size:13px;font-weight:700}
+.hero{
+ max-width:850px;margin:75px auto;text-align:center;padding:40px 20px;
+}
+.hero h1{font-size:58px;letter-spacing:-2px}
+.hero p{font-size:18px;line-height:1.8;color:#bdc9df}
 small{color:#9aa8c2}
+@media(max-width:600px){
+ .wrap{padding:18px 14px}
+ nav{padding:15px}
+ .hero{margin:35px auto;padding:20px 5px}
+ .hero h1{font-size:38px}
+ h1{font-size:30px}
+ .card{padding:18px}
+}
 </style>
 """
+
 def page(body, title="TrackGrow"):
     return render_template_string("""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{title}}</title>""" + STYLE + """</head><body><nav><a class="logo" href="/">TrackGrow</a><span>{% if email %}{{email}} · <a href="/logout">Logout</a>{% else %}<a href="/login">Login</a>{% endif %}</span></nav><main class="wrap">""" + body + """</main></body></html>""",
         title=title, email=session.get("email"))
