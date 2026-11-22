@@ -102,14 +102,42 @@ def page(body, title="TrackGrow"):
 def home():
     return page("""<section class="hero"><div class="muted">SMART TELEGRAM GROWTH TRACKING</div><h1>Track Every Click.<br>Measure Every Join.</h1><p>Create campaign landing pages, share unique tracking links and understand which campaigns bring visitors to your Telegram channel.</p><a class="btn" href="/register">Create free account</a> <a class="btn btn2" href="/login">Client login</a><p><small>Early MVP · Telegram membership verification will be connected in a later setup step.</small></p></section>""", "TrackGrow — Smart Tracking")
 
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email=request.form.get("email","").strip().lower()
-        password=request.form.get("password","")
-        if not email or len(password)<8:
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not email or len(password) < 8:
             flash("Enter a valid email and password with at least 8 characters.")
         else:
+            with db() as con:
+                existing = con.execute(
+                    "SELECT id FROM users WHERE email=?",
+                    (email,)
+                ).fetchone()
+
+                if existing:
+                    flash("Email already registered. Please login.")
+                else:
+                    con.execute(
+                        "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+                        (email, generate_password_hash(password))
+                    )
+                    flash("Account created successfully. Please login.")
+                    return redirect(url_for("login"))
+
+    return page("""
+    <h1>Create Account</h1>
+    <form method="post">
+        <label>Email</label>
+        <input type="email" name="email" required>
+        <label>Password (minimum 8 characters)</label>
+        <input type="password" name="password" required minlength="8">
+        <button type="submit">Register</button>
+    </form>
+    <p><a href="/login">Already have an account? Login</a></p>
+    """, "Register")
 
 @app.route("/dashboard")
 @login_required
