@@ -110,30 +110,6 @@ def register():
         if not email or len(password)<8:
             flash("Enter a valid email and password with at least 8 characters.")
         else:
-            try:
-                with db() as con:
-                    con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)",(email,generate_password_hash(password)))
-                flash("Account created. Please log in.")
-                return redirect(url_for("login"))
-            except sqlite3.IntegrityError:
-                flash("That email is already registered.")
-    return page("""<div class="card"><h2>Create client account</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password (minimum 8 characters)</label><input name="password" type="password" minlength="8" required><button>Create account</button></form></div>""","Register")
-
-@app.route("/login", methods=["GET","POST"])
-def login():
-    if request.method=="POST":
-        email=request.form.get("email","").strip().lower()
-        with db() as con: user=con.execute("SELECT * FROM users WHERE email=?",(email,)).fetchone()
-        if user and check_password_hash(user["password_hash"],request.form.get("password","")):
-            session["user_id"]=user["id"]; session["email"]=user["email"]
-            return redirect(url_for("dashboard"))
-        flash("Email or password is incorrect.")
-    return page("""<div class="card"><h2>Client login</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password</label><input name="password" type="password" required><button>Login</button></form><p><a href="/register">Create an account</a></p></div>""","Login")
-
-@app.route("/logout")
-def logout():
-    session.clear(); return redirect(url_for("home"))
-
 
 @app.route("/dashboard")
 @login_required
@@ -141,6 +117,11 @@ def dashboard():
     with db() as con:
         campaigns = con.execute(
             "SELECT * FROM campaigns WHERE user_id=? ORDER BY id DESC",
+            (session["user_id"],)
+        ).fetchall()
+
+        pages = con.execute(
+            "SELECT * FROM pages WHERE user_id=? ORDER BY id DESC",
             (session["user_id"],)
         ).fetchall()
 
@@ -168,32 +149,105 @@ def dashboard():
             AND status IN ('member','administrator','creator')
         """).fetchone()[0]
 
-    rows = "".join(
-        f"""<div class="card"><h3>{c['name']}</h3>
+    campaign_rows = "".join(
+        f"""<div class="card">
+        <h3>{c['name']}</h3>
         <p class="muted">{c['clicks']} tracked clicks · Telegram: {c['channel_url']}</p>
         <p><a href="/c/{c['slug']}" target="_blank">Open landing page</a> ·
-        <a href="/t/{c['slug']}" target="_blank">Tracking link</a></p></div>"""
+        <a href="/t/{c['slug']}" target="_blank">Tracking link</a></p>
+        </div>"""
         for c in campaigns
     )
 
-    return page(f"""<h1>Client Dashboard</h1>
-    <p class="muted">Your campaign workspace</p>
+    page_rows = "".join(
+        f"""<div class="card">
+        <h3>{p['title']}</h3>
+        <p class="muted">Template: {p['template_id']} · Status: {p['status']}</p>
+        </div>"""
+        for p in pages
+    )
+
+    return page(f"""
+    <h1>Client Dashboard</h1>
+    <p class="muted">Your TrackGrow workspace</p>
+
     <div class="grid">
-    <div class="card"><div class="muted">Tracked clicks</div><div class="stat">{totals}</div></div>
-    <div class="card"><div class="muted">Campaigns</div><div class="stat">{len(campaigns)}</div></div>
-    <div class="card"><div class="muted">Verified Telegram joins</div><div class="stat">{joins}</div></div>
+        <div class="card">
+            <div class="muted">Tracked clicks</div>
+            <div class="stat">{totals}</div>
+        </div>
+        <div class="card">
+            <div class="muted">Campaigns</div>
+            <div class="stat">{len(campaigns)}</div>
+        </div>
+        <div class="card">
+            <div class="muted">Verified Telegram joins</div>
+            <div class="stat">{joins}</div>
+        </div>
+        <div class="card">
+            <div class="muted">Landing Pages</div>
+            <div class="stat">{len(pages)}</div>
+        </div>
     </div>
-    <div class="card"><h2>Create a landing page & campaign</h2>
-    <form method="post" action="/campaigns/new">
-    <label>Campaign name</label><input name="name" required placeholder="Example: Instagram November Campaign">
-    <label>Telegram channel invite URL</label><input name="channel_url" type="url" required placeholder="https://t.me/+...">
-    <label>Landing page headline</label><input name="headline" required value="Join our Telegram community">
-    <label>Description</label><textarea name="description" rows="3">Get updates and community announcements on Telegram.</textarea>
-    <label>Button text</label><input name="button_text" value="Join on Telegram">
-    <button>Create campaign</button></form></div>
+
+    <div class="card">
+        <h2>My Landing Pages</h2>
+        <p>Create and manage professional landing pages.</p>
+        <a href="/pages/new"><button type="button">Create Landing Page</button></a>
+        {page_rows or '<p class="muted">No landing pages created yet.</p>'}
+    </div>
+
+    <div class="card">
+        <h2>Create a landing page & campaign</h2>
+        <form method="post" action="/campaigns/new">
+            <label>Campaign name</label>
+            <input name="name" required placeholder="Example: Instagram November Campaign">
+
+            <label>Telegram channel invite URL</label>
+            <input name="channel_url" type="url" required placeholder="https://t.me/+...">
+
+            <label>Landing page headline</label>
+            <input name="headline" required value="Join our Telegram community">
+
+            <label>Description</label>
+            <textarea name="description" rows="3">Get updates and community announcements on Telegram.</textarea>
+
+            <label>Button text</label>
+            <input name="button_text" value="Join on Telegram">
+
+            <button>Create campaign</button>
+        </form>
+    </div>
+
     <h2>Your campaigns</h2>
-    {rows or '<p class="muted">No campaigns yet. Create your first one above.</p>'}
+    {campaign_rows or '<p class="muted">No campaigns yet.</p>'}
     """, "Dashboard")
+            try:
+                with db() as con:
+                    con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)",(email,generate_password_hash(password)))
+                flash("Account created. Please log in.")
+                return redirect(url_for("login"))
+            except sqlite3.IntegrityError:
+                flash("That email is already registered.")
+    return page("""<div class="card"><h2>Create client account</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password (minimum 8 characters)</label><input name="password" type="password" minlength="8" required><button>Create account</button></form></div>""","Register")
+
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method=="POST":
+        email=request.form.get("email","").strip().lower()
+        with db() as con: user=con.execute("SELECT * FROM users WHERE email=?",(email,)).fetchone()
+        if user and check_password_hash(user["password_hash"],request.form.get("password","")):
+            session["user_id"]=user["id"]; session["email"]=user["email"]
+            return redirect(url_for("dashboard"))
+        flash("Email or password is incorrect.")
+    return page("""<div class="card"><h2>Client login</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password</label><input name="password" type="password" required><button>Login</button></form><p><a href="/register">Create an account</a></p></div>""","Login")
+
+@app.route("/logout")
+def logout():
+    session.clear(); return redirect(url_for("home"))
+
+
+
 
 @app.route("/campaigns/new", methods=["POST"])
 @login_required
