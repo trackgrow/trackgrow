@@ -111,14 +111,25 @@ def login():
 def logout():
     session.clear(); return redirect(url_for("home"))
 
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
     with db() as con:
-        campaigns=con.execute("SELECT * FROM campaigns WHERE user_id=? ORDER BY id DESC",(session["user_id"],)).fetchall()
-        totals=con.execute("SELECT COUNT(*) n FROM events e JOIN campaigns c ON c.id=e.campaign_id WHERE c.user_id=? AND e.event_type='click'",(session["user_id"],)).fetchone()["n"]
+        campaigns = con.execute(
+            "SELECT * FROM campaigns WHERE user_id=? ORDER BY id DESC",
+            (session["user_id"],)
+        ).fetchall()
 
-            con.execute("""        CREATE TABLE IF NOT EXISTS telegram_members (
+        totals = con.execute(
+            """SELECT COUNT(*) n FROM events e
+            JOIN campaigns c ON c.id=e.campaign_id
+            WHERE c.user_id=? AND e.event_type='click'""",
+            (session["user_id"],)
+        ).fetchone()["n"]
+
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_members (
                 chat_id TEXT NOT NULL,
                 telegram_user_id INTEGER NOT NULL,
                 username TEXT,
@@ -127,13 +138,39 @@ def dashboard():
                 UNIQUE(chat_id, telegram_user_id)
             )
         """)
-        joins=con.execute("""
-SELECT COUNT(*) FROM telegram_members
-WHERE chat_id='-1004489288080'
-AND status IN ('member','administrator','creator')
-""").fetchone()[0]
-    rows="".join(f"""<div class="card"><h3>{c['name']}</h3><p class="muted">{c['clicks']} tracked clicks · Telegram: {c['channel_url']}</p><p><a href="/c/{c['slug']}" target="_blank">Open landing page</a> · <a href="/t/{c['slug']}" target="_blank">Tracking link</a></p></div>""" for c in campaigns)
-    return page(f"""<h1>Client Dashboard</h1><p class="muted">Your campaign workspace</p><div class="grid"><div class="card"><div class="muted">Tracked clicks</div><div class="stat">{totals}</div></div><div class="card"><div class="muted">Campaigns</div><div class="stat">{len(campaigns)}</div></div><div class="card"><div class="muted">Verified Telegram joins</div><div class="stat">(joins)</div></div></div><div class="card"><h2>Create a landing page & campaign</h2><form method="post" action="/campaigns/new"><label>Campaign name</label><input name="name" required placeholder="Example: Instagram November Campaign"><label>Telegram channel invite URL</label><input name="channel_url" type="url" required placeholder="https://t.me/+..."><label>Landing page headline</label><input name="headline" required value="Join our Telegram community"><label>Description</label><textarea name="description" rows="3">Get updates and community announcements on Telegram.</textarea><label>Button text</label><input name="button_text" value="Join on Telegram"><button>Create campaign</button></form></div><h2>Your campaigns</h2>{rows or '<p class="muted">No campaigns yet. Create your first one above.</p>'}""","Dashboard")
+
+        joins = con.execute("""
+            SELECT COUNT(*) FROM telegram_members
+            WHERE chat_id='-1004489288080'
+            AND status IN ('member','administrator','creator')
+        """).fetchone()[0]
+
+    rows = "".join(
+        f"""<div class="card"><h3>{c['name']}</h3>
+        <p class="muted">{c['clicks']} tracked clicks · Telegram: {c['channel_url']}</p>
+        <p><a href="/c/{c['slug']}" target="_blank">Open landing page</a> ·
+        <a href="/t/{c['slug']}" target="_blank">Tracking link</a></p></div>"""
+        for c in campaigns
+    )
+
+    return page(f"""<h1>Client Dashboard</h1>
+    <p class="muted">Your campaign workspace</p>
+    <div class="grid">
+    <div class="card"><div class="muted">Tracked clicks</div><div class="stat">{totals}</div></div>
+    <div class="card"><div class="muted">Campaigns</div><div class="stat">{len(campaigns)}</div></div>
+    <div class="card"><div class="muted">Verified Telegram joins</div><div class="stat">{joins}</div></div>
+    </div>
+    <div class="card"><h2>Create a landing page & campaign</h2>
+    <form method="post" action="/campaigns/new">
+    <label>Campaign name</label><input name="name" required placeholder="Example: Instagram November Campaign">
+    <label>Telegram channel invite URL</label><input name="channel_url" type="url" required placeholder="https://t.me/+...">
+    <label>Landing page headline</label><input name="headline" required value="Join our Telegram community">
+    <label>Description</label><textarea name="description" rows="3">Get updates and community announcements on Telegram.</textarea>
+    <label>Button text</label><input name="button_text" value="Join on Telegram">
+    <button>Create campaign</button></form></div>
+    <h2>Your campaigns</h2>
+    {rows or '<p class="muted">No campaigns yet. Create your first one above.</p>'}
+    """, "Dashboard")
 
 @app.route("/campaigns/new", methods=["POST"])
 @login_required
@@ -184,14 +221,13 @@ def telegram_webhook():
 
     if member:
         chat = member.get("chat", {})
-        print("TRACKGROW_CHANNEL_ID:", chat.get("id"))
         new_member = member.get("new_chat_member", {})
         user = new_member.get("user", {})
         status = new_member.get("status", "left")
 
         if chat.get("id") and user.get("id"):
             with db() as con:
-                        con.execute("""
+                con.execute("""
                     CREATE TABLE IF NOT EXISTS telegram_members (
                         chat_id TEXT NOT NULL,
                         telegram_user_id INTEGER NOT NULL,
@@ -202,7 +238,7 @@ def telegram_webhook():
                     )
                 """)
 
-                        con.execute("""
+                con.execute("""
                     INSERT INTO telegram_members
                     (chat_id, telegram_user_id, username, status)
                     VALUES (?, ?, ?, ?)
@@ -219,6 +255,7 @@ def telegram_webhook():
                 ))
 
     return {"ok": True}
+
     
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
