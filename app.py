@@ -250,15 +250,7 @@ def dashboard():
     <h2>Your campaigns</h2>
     {campaign_rows or '<p class="muted">No campaigns yet.</p>'}
     """, "Dashboard")
-            try:
-                with db() as con:
-                    con.execute("INSERT INTO users(email,password_hash) VALUES(?,?)",(email,generate_password_hash(password)))
-                flash("Account created. Please log in.")
-                return redirect(url_for("login"))
-            except sqlite3.IntegrityError:
-                flash("That email is already registered.")
-    return page("""<div class="card"><h2>Create client account</h2>{% for m in get_flashed_messages() %}<p class="flash">{{m}}</p>{% endfor %}<form method="post"><label>Email</label><input name="email" type="email" required><label>Password (minimum 8 characters)</label><input name="password" type="password" minlength="8" required><button>Create account</button></form></div>""","Register")
-
+            
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method=="POST":
