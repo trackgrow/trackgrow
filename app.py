@@ -429,8 +429,7 @@ def telegram_webhook():
                 ))
 
     return {"ok": True}
-
-    @app.route("/editor/<slug>", methods=["GET", "POST"])
+ @app.route("/editor/<slug>", methods=["GET", "POST"])
 @login_required
 def edit_page(slug):
     with db() as con:
