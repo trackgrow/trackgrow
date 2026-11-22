@@ -54,6 +54,21 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                template_id TEXT NOT NULL,
+                page_data TEXT NOT NULL,
+                status TEXT DEFAULT 'draft',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                published_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+        """)
+        
 init_db()
 def login_required(fn):
     @wraps(fn)
