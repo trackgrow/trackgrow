@@ -657,7 +657,9 @@ def edit_page(slug):
             data = {
                 "headline": request.form.get("headline", ""),
                 "description": request.form.get("description", ""),
-                "button_text": request.form.get("button_text", "")
+                "button_text": request.form.get("button_text", ""),
+                "button_url": request.form.get("button_url", ""),
+                "bg_color": request.form.get("bg_color", "#101b32")
             }
 
             if title:
@@ -665,32 +667,55 @@ def edit_page(slug):
                     "UPDATE pages SET title=?, page_data=? WHERE id=?",
                     (title, json.dumps(data), p["id"])
                 )
-                flash("Landing page updated!")
-                return redirect(url_for("dashboard"))
+                flash("Landing page updated successfully!")
+                return redirect(url_for("edit_page", slug=slug))
 
     return page("""
-    <h1>Edit Landing Page</h1>
+    <div class="grid">
+        <div class="card">
+            <h1>Landing Page Editor</h1>
+            <p class="muted">Customize your landing page content.</p>
 
-    <form method="post">
-        <label>Page Title</label>
-        <input name="title" value="{{title}}" required>
+            <form method="post">
+                <label>Page Title</label>
+                <input name="title" value="{{title}}" required>
 
-        <label>Headline</label>
-        <input name="headline" value="{{headline}}" required>
+                <label>Headline</label>
+                <input name="headline" value="{{headline}}" required>
 
-        <label>Description</label>
-        <textarea name="description" required>{{description}}</textarea>
+                <label>Description</label>
+                <textarea name="description" rows="5" required>{{description}}</textarea>
 
-        <label>Button Text</label>
-        <input name="button_text" value="{{button_text}}" required>
+                <label>Button Text</label>
+                <input name="button_text" value="{{button_text}}" required>
 
-        <button type="submit">Save Changes</button>
-    </form>
+                <label>Button Link</label>
+                <input name="button_url" value="{{button_url}}" placeholder="https://example.com">
+
+                <label>Background Color</label>
+                <input type="color" name="bg_color" value="{{bg_color}}">
+
+                <button type="submit">Save Changes</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Live Preview</h2>
+            <div style="background:{{bg_color}};padding:35px 20px;border-radius:14px;text-align:center;min-height:300px;">
+                <h1>{{headline}}</h1>
+                <p>{{description}}</p>
+                <span class="btn">{{button_text}}</span>
+            </div>
+            <p class="muted">Preview of your page design.</p>
+        </div>
+    </div>
     """.replace("{{title}}", p["title"])
        .replace("{{headline}}", data.get("headline", p["title"]))
        .replace("{{description}}", data.get("description", "Describe your offer here."))
-       .replace("{{button_text}}", data.get("button_text", "Get Started")),
-       "Edit Landing Page")
+       .replace("{{button_text}}", data.get("button_text", "Get Started"))
+       .replace("{{button_url}}", data.get("button_url", ""))
+       .replace("{{bg_color}}", data.get("bg_color", "#101b32")),
+       "Landing Page Editor")
 
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
