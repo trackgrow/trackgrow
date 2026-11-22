@@ -380,6 +380,7 @@ def track(slug):
 def health():
     return {"status":"ok","app":"TrackGrow","note":"MVP running; Telegram verified-join webhook is not configured yet."}
 
+
 @app.route("/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     secret = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
@@ -429,7 +430,9 @@ def telegram_webhook():
                 ))
 
     return {"ok": True}
- @app.route("/editor/<slug>", methods=["GET", "POST"])
+
+
+@app.route("/editor/<slug>", methods=["GET", "POST"])
 @login_required
 def edit_page(slug):
     with db() as con:
@@ -445,6 +448,7 @@ def edit_page(slug):
 
         if request.method == "POST":
             title = request.form.get("title", "").strip()
+
             data = {
                 "headline": request.form.get("headline", ""),
                 "description": request.form.get("description", ""),
@@ -461,6 +465,7 @@ def edit_page(slug):
 
     return page("""
     <h1>Edit Landing Page</h1>
+
     <form method="post">
         <label>Page Title</label>
         <input name="title" value="{{title}}" required>
@@ -481,5 +486,6 @@ def edit_page(slug):
        .replace("{{description}}", data.get("description", "Describe your offer here."))
        .replace("{{button_text}}", data.get("button_text", "Get Started")),
        "Edit Landing Page")
+
 if __name__=="__main__":
     app.run(host="0.0.0.0",port=int(os.environ.get("PORT",5000)),debug=False)
