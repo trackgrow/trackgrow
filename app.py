@@ -814,54 +814,7 @@ def edit_page(slug):
        .replace("{{button_url}}", data.get("button_url", ""))
        .replace("{{bg_color}}", data.get("bg_color", "#101b32"))
        .replace("{{slug}}", slug),
-       "TrackGrow Visual Editor")
-            </div>
-
-        <div class="card">
-            <h2>Live Preview</h2>
-            <div id="preview" style="background:{{bg_color}};padding:35px 20px;border-radius:14px;text-align:center;min-height:300px;">
-                <h1 id="preview-headline">{{headline}}</h1>
-                <p id="preview-description">{{description}}</p>
-                <a class="btn" id="preview-button" href="{{button_url}}">{{button_text}}</a>
-            </div>
-            <p class="muted">Your landing page preview.</p>
-        </div>
-    </div>
-        <script>
-    const form = document.getElementById("editor-form");
-    const headline = document.querySelector('[name="headline"]');
-    const description = document.querySelector('[name="description"]');
-    const buttonText = document.querySelector('[name="button_text"]');
-    const buttonUrl = document.querySelector('[name="button_url"]');
-    const bgColor = document.querySelector('[name="bg_color"]');
-
-    headline.addEventListener("input", () => {
-        document.getElementById("preview-headline").textContent = headline.value;
-    });
-
-    description.addEventListener("input", () => {
-        document.getElementById("preview-description").textContent = description.value;
-    });
-
-    buttonText.addEventListener("input", () => {
-        document.getElementById("preview-button").textContent = buttonText.value;
-    });
-
-    buttonUrl.addEventListener("input", () => {
-        document.getElementById("preview-button").href = buttonUrl.value;
-    });
-
-    bgColor.addEventListener("input", () => {
-        document.getElementById("preview").style.background = bgColor.value;
-    });
-    </script>
-    """.replace("{{title}}", p["title"])
-       .replace("{{headline}}", data.get("headline", p["title"]))
-       .replace("{{description}}", data.get("description", "Describe your offer here."))
-       .replace("{{button_text}}", data.get("button_text", "Get Started"))
-       .replace("{{button_url}}", data.get("button_url", ""))
-       .replace("{{bg_color}}", data.get("bg_color", "#101b32")),
-       "TrackGrow Visual Editor")
+       "TrackGrow Visual Editor")      
 @app.route("/publish/<slug>", methods=["POST"])
 @login_required
 def publish_page(slug):
