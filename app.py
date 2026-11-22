@@ -15,14 +15,50 @@ def db():
     return conn
 
 def init_db():
+    
+def init_db():
     with db() as con:
         con.executescript("""
-                try:
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            channel_url TEXT NOT NULL,
+            headline TEXT NOT NULL,
+            description TEXT NOT NULL,
+            button_text TEXT NOT NULL,
+            clicks INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            source TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+        );
+        """)
+
+        try:
             con.execute(
                 "ALTER TABLE campaigns ADD COLUMN telegram_invite_link TEXT"
             )
         except sqlite3.OperationalError:
             pass
+
+init_db()
+
 init_db()
 
 def login_required(fn):
