@@ -447,51 +447,108 @@ def new_page():
         return redirect(url_for("dashboard"))
 
     return page("""
-    <h1>Choose Your Landing Page Template</h1>
-    <p class="muted">Select a design to get started.</p>
+<style>
+.gallery-head{text-align:center;margin:35px 0}
+.gallery-head h1{font-size:36px}
+.template-card{background:#111d32;border:1px solid #293b5a;border-radius:18px;overflow:hidden}
+.template-preview{height:180px;padding:20px;display:flex;flex-direction:column;justify-content:center;text-align:center}
+.preview-digital{background:linear-gradient(135deg,#293e77,#7657e9)}
+.preview-course{background:linear-gradient(135deg,#075b58,#16a37a)}
+.preview-agency{background:linear-gradient(135deg,#44265f,#a34e9c)}
+.preview-telegram{background:linear-gradient(135deg,#14518b,#2698d6)}
+.preview-title{font-size:22px;font-weight:900;color:white}
+.preview-line{height:7px;background:#ffffff80;border-radius:8px;margin:8px auto;width:65%}
+.template-info{padding:20px}
+.template-info p{color:#9aa9c2;min-height:48px}
+.template-tag{font-size:11px;color:#9db5ff;background:#1b2c4d;padding:6px 10px;border-radius:20px}
+</style>
 
-    <div class="grid">
-        <div class="card">
+<div class="gallery-head">
+    <div class="muted">TRACKGROW TEMPLATE LIBRARY</div>
+    <h1>Choose Your Perfect Template</h1>
+    <p class="muted">Select a design and start building your landing page.</p>
+</div>
+
+<div class="grid">
+
+    <div class="template-card">
+        <div class="template-preview preview-digital">
+            <div class="preview-title">Your Digital Product</div>
+            <div class="preview-line"></div>
+            <div class="preview-line" style="width:40%"></div>
+            <div>🛍️</div>
+        </div>
+        <div class="template-info">
+            <span class="template-tag">DIGITAL PRODUCTS</span>
             <h2>Digital Product</h2>
-            <p>For ebooks, PDFs and digital downloads.</p>
+            <p>Perfect for ebooks, PDFs and digital downloads.</p>
             <form method="post">
-                <input name="title" placeholder="Page title" required>
+                <input name="title" placeholder="Enter page title" required>
                 <input type="hidden" name="template_id" value="digital">
-                <button type="submit">Choose Template</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h2>Course & Coaching</h2>
-            <p>For online courses and coaching services.</p>
-            <form method="post">
-                <input name="title" placeholder="Page title" required>
-                <input type="hidden" name="template_id" value="course">
-                <button type="submit">Choose Template</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h2>Agency & Services</h2>
-            <p>For agencies and professional services.</p>
-            <form method="post">
-                <input name="title" placeholder="Page title" required>
-                <input type="hidden" name="template_id" value="agency">
-                <button type="submit">Choose Template</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h2>Telegram Promotion</h2>
-            <p>For Telegram channel and community promotion.</p>
-            <form method="post">
-                <input name="title" placeholder="Page title" required>
-                <input type="hidden" name="template_id" value="telegram">
-                <button type="submit">Choose Template</button>
+                <button type="submit">Use This Template →</button>
             </form>
         </div>
     </div>
-    """, "Choose Template")
+
+    <div class="template-card">
+        <div class="template-preview preview-course">
+            <div class="preview-title">Learn Something New</div>
+            <div class="preview-line"></div>
+            <div class="preview-line" style="width:40%"></div>
+            <div>🎓</div>
+        </div>
+        <div class="template-info">
+            <span class="template-tag">EDUCATION</span>
+            <h2>Course & Coaching</h2>
+            <p>For online courses, mentors and coaching businesses.</p>
+            <form method="post">
+                <input name="title" placeholder="Enter page title" required>
+                <input type="hidden" name="template_id" value="course">
+                <button type="submit">Use This Template →</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="template-card">
+        <div class="template-preview preview-agency">
+            <div class="preview-title">Grow Your Business</div>
+            <div class="preview-line"></div>
+            <div class="preview-line" style="width:40%"></div>
+            <div>💼</div>
+        </div>
+        <div class="template-info">
+            <span class="template-tag">BUSINESS</span>
+            <h2>Agency & Services</h2>
+            <p>For agencies, freelancers and service providers.</p>
+            <form method="post">
+                <input name="title" placeholder="Enter page title" required>
+                <input type="hidden" name="template_id" value="agency">
+                <button type="submit">Use This Template →</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="template-card">
+        <div class="template-preview preview-telegram">
+            <div class="preview-title">Join Our Community</div>
+            <div class="preview-line"></div>
+            <div class="preview-line" style="width:40%"></div>
+            <div>📢</div>
+        </div>
+        <div class="template-info">
+            <span class="template-tag">TELEGRAM</span>
+            <h2>Telegram Promotion</h2>
+            <p>For Telegram channels and community promotions.</p>
+            <form method="post">
+                <input name="title" placeholder="Enter page title" required>
+                <input type="hidden" name="template_id" value="telegram">
+                <button type="submit">Use This Template →</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+""", "Template Gallery")
 
 
 @app.route("/campaigns/new", methods=["POST"])
